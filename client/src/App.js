@@ -2,10 +2,12 @@ import React, { Component } from "react";
 import SimpleStorageContract from "./contracts/SimpleStorage.json";
 import getWeb3 from "./getWeb3";
 
+import ipfs from './ipfs';
+
 import "./App.css";
 
 class App extends Component {
-  state = { storageValue: 0, web3: null, accounts: null, contract: null };
+  state = { web3: null, accounts: null, contract: null, buffer: null, ipfsHash: "" };
 
   componentDidMount = async () => {
     try {
@@ -39,32 +41,60 @@ class App extends Component {
     const { accounts, contract } = this.state;
 
     // Stores a given value, 5 by default.
-    await contract.methods.set(5).send({ from: accounts[0] });
 
     // Get the value from the contract to prove it worked.
     const response = await contract.methods.get().call();
-
+    console.log(response)
+    this.setState({ ipfsHash: response })
     // Update state with the result.
-    this.setState({ storageValue: response });
   };
+  caputreFile = (event) => {
+    console.log("caputreFile")
+    event.preventDefault()
+    const file = event.target.files[0]
+    const reader = new window.FileReader()
+    reader.readAsArrayBuffer(file)
+    reader.onloadend = () => {
+      this.setState({ buffer: Buffer(reader.result) })
+      console.log('buffer', this.state.buffer)
+    }
 
+  }
+  onSubmit = async(event) => {
+    event.preventDefault()
+    console.log("onSubmit")
+    ipfs.files.add(this.state.buffer, async(err, res) => {
+      if (err) {
+        console.error(err)
+        return
+      }
+      this.setState({ ipfsHash: res[0].hash })
+      console.log('ipfsHash', this.state.ipfsHash)
+      await this.state.contract.methods.set(this.state.ipfsHash).send({ from:this.state.accounts[0] });
+  
+
+    })
+
+
+  }
   render() {
     if (!this.state.web3) {
       return <div>Loading Web3, accounts, and contract...</div>;
     }
     return (
       <div className="App">
-        <h1>Good to Go!</h1>
-        <p>Your Truffle Box is installed and ready.</p>
-        <h2>Smart Contract Example</h2>
-        <p>
-          If your contracts compiled and migrated successfully, below will show
-          a stored value of 5 (by default).
-        </p>
-        <p>
-          Try changing the value stored on <strong>line 40</strong> of App.js.
-        </p>
-        <div>The stored value is: {this.state.storageValue}</div>
+        <nav className="navbar pure-menu pure-menu-horizontal">
+          <a href="#" className="pure-menu pure-menu-linl">IPFS File Upload dapp</a>
+        </nav>
+        <h1>Your Images</h1>
+        <p>YThis Image is stored on IPFS & Ethereum Blockchain</p>
+        <img src={`https://ipfs.io/ipfs/${this.state.ipfsHash}`} alt=""></img>
+        <h2>Upload Image</h2>
+        <form onSubmit={this.onSubmit}>
+          <input type="file" onChange={this.caputreFile} />
+          <button type="submit">Submit</button>
+
+        </form>
       </div>
     );
   }
